@@ -1,4 +1,3 @@
-
 # Mailer API
 
 This is a simple Mailer API built using FastAPI, which allows sending emails with attachments, CC, and BCC functionality using Gmail's SMTP server.
@@ -53,7 +52,7 @@ Replace `your_email@gmail.com` with your Gmail address and `your_app_password` w
 Start the FastAPI server using Uvicorn:
 
 ```bash
-uvicorn app.main:app --reload
+uvicorn app.main:app --reload --no-server-header
 ```
 
 The API will be available at `http://127.0.0.1:8000`.
@@ -92,6 +91,10 @@ curl -X 'POST' \
 ```
 
 This will send an email with the provided subject and body to the specified recipients, including CC and BCC recipients, and attach the specified file.
+
+## API Documentation
+
+To test and check the functionality, you can access [FastAPI docs](localhost:8000/docs).
 
 ## License
 
