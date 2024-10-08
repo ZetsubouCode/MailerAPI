@@ -1,154 +1,98 @@
-# MailerAPI
 
-API to send email using brevo, build using FastAPI
+# Mailer API
 
-# FastAPI Email Sender with Brevo (Sendinblue)
-
-This project is a simple FastAPI application that provides an API endpoint to send emails using the Brevo (Sendinblue) transactional email service. It follows best practices by utilizing background tasks and asynchronous requests to ensure the API is responsive and scalable.
+This is a simple Mailer API built using FastAPI, which allows sending emails with attachments, CC, and BCC functionality using Gmail's SMTP server.
 
 ## Features
 
-- Send emails using Brevo (Sendinblue) API.
-- Asynchronous email sending for better performance.
-- Background task support using FastAPI’s `BackgroundTasks`.
-- Environment-based configuration using Pydantic and `.env` files.
-- Modular project structure for scalability and maintainability.
+- Send emails to multiple recipients
+- Support for CC and BCC
+- Attachments support
+- Uses Gmail SMTP for email sending
 
-## Getting Started
+## Prerequisites
 
-### Prerequisites
+- Python 3.8+
+- Gmail account with [App Password](https://support.google.com/accounts/answer/185833)
 
-- **Python 3.8+**
-- **FastAPI** and **Uvicorn** for running the API.
-- A **Brevo (Sendinblue) account** to obtain an API key for sending emails.
+## Setup Instructions
 
-### Installation
+### 1. Clone the Repository
 
-1. **Clone the repository**:
+```bash
+git clone https://github.com/yourusername/mailer-api.git
+cd mailer-api
+```
 
-   ```bash
-   git clone https://github.com/your-username/fastapi-brevo-email-sender.git
-   cd fastapi-brevo-email-sender
-   ```
-2. **Create a virtual environment**:
+### 2. Create a virtual environment
 
-   ```bash
-   python -m venv venv
-   source venv/bin/activate   # On Windows: venv\Scripts\activate
-   ```
-3. **Install the dependencies**:
+```bash
+python -m venv env
+source env/bin/activate  # On Windows: env\Scripts\activate
+```
 
-   ```bash
-   pip install -r requirements.txt
-   ```
-4. **Configure environment variables**:
+### 3. Install the dependencies
 
-   Create a `.env` file in the root of the project with the following content:
+```bash
+pip install -r requirements.txt
+```
 
-   ```
-   API_KEY=your_brevo_api_key
-   SENDER_EMAIL=your_verified_sender_email@example.com
-   ```
+### 4. Environment Variables
 
-   Replace:
+Create a `.env` file in the root of your project and add the following content:
 
-   - `your_brevo_api_key` with your actual Brevo (Sendinblue) API key.
-   - `your_verified_sender_email@example.com` with the email you’ve verified in Brevo as the sender.
+```env
+GMAIL_USER=your_email@gmail.com
+GMAIL_PASSWORD=your_app_password
+```
 
-### Running the Application
+Replace `your_email@gmail.com` with your Gmail address and `your_app_password` with the app password you generated.
 
-To run the FastAPI application locally:
+### 5. Run the API
+
+Start the FastAPI server using Uvicorn:
 
 ```bash
 uvicorn app.main:app --reload
 ```
 
-The API will be available at: `http://127.0.0.1:8000`
+The API will be available at `http://127.0.0.1:8000`.
 
-### API Endpoints
+## API Endpoints
 
-#### POST `/send-email/`
+### Send Email
 
-Send an email using Brevo's transactional email API.
+#### Endpoint: `/send-email/`
 
-- **URL**: `/send-email/`
 - **Method**: `POST`
-- **Content-Type**: `application/json`
+- **Description**: Sends an email to one or more recipients with support for CC, BCC, and attachments.
 
-#### Request Body
+#### Parameters:
 
-```json
-{
-  "to_email": "recipient@example.com",
-  "subject": "Test Email",
-  "body": "<h1>Hello from FastAPI and Brevo!</h1>"
-}
-```
+| Name           | Type           | Required | Description                                  |
+| -------------- | -------------- | -------- | -------------------------------------------- |
+| `to_emails`  | `str`        | Yes      | Comma-separated list of recipient emails     |
+| `cc_emails`  | `str`        | No       | Comma-separated list of CC recipient emails  |
+| `bcc_emails` | `str`        | No       | Comma-separated list of BCC recipient emails |
+| `subject`    | `str`        | Yes      | Subject of the email                         |
+| `body`       | `str`        | Yes      | Body of the email                            |
+| `attachment` | `UploadFile` | No       | Optional file attachment                     |
 
-- `to_email`: The recipient’s email address.
-- `subject`: The email subject.
-- `body`: The HTML content of the email.
-
-#### Example `curl` Command
+#### Example cURL Request:
 
 ```bash
 curl -X 'POST' \
   'http://127.0.0.1:8000/send-email/' \
-  -H 'Content-Type: application/json' \
-  -d '{
-  "to_email": "recipient@example.com",
-  "subject": "Test Email",
-  "body": "<h1>Hello from FastAPI and Brevo!</h1>"
-}'
+  -F 'to_emails=recipient1@example.com,recipient2@example.com' \
+  -F 'cc_emails=cc1@example.com,cc2@example.com' \
+  -F 'bcc_emails=bcc1@example.com' \
+  -F 'subject=Test Email' \
+  -F 'body=This is a test email.' \
+  -F 'attachment=@/path/to/attachment.pdf'
 ```
 
-#### Response
+This will send an email with the provided subject and body to the specified recipients, including CC and BCC recipients, and attach the specified file.
 
-On success:
+## License
 
-```json
-{
-  "message": "Email is being sent in the background!"
-}
-```
-
-On error:
-
-```json
-{
-  "detail": "Failed to send email: [Error details]"
-}
-```
-
-### Dependencies
-
-- **FastAPI**: High-performance web framework for building APIs with Python.
-- **Uvicorn**: ASGI server for serving FastAPI apps.
-- **httpx**: Async HTTP client for making API requests.
-- **python-dotenv**: For loading environment variables from `.env` files.
-- **pydantic**: For data validation and settings management.
-
-### Best Practices Followed
-
-- **Environment Variables**: Sensitive information such as API keys and email addresses are managed using `.env` files and loaded via Pydantic’s `BaseSettings`.
-- **Asynchronous Code**: Email sending is done asynchronously using `httpx` to avoid blocking the main request handler.
-- **Background Tasks**: Emails are sent in the background using FastAPI's `BackgroundTasks`, ensuring the API is non-blocking and responsive.
-
-### Future Improvements
-
-- Add more robust error handling and logging.
-- Implement email queuing for higher email volumes.
-- Support for multiple email providers by extending the service layer.
-
----
-
-### License
-
-This project is licensed under the MIT License. Feel free to use, modify, and distribute it as needed.
-
----
-
-### Acknowledgements
-
-- FastAPI documentation
-- Brevo (Sendinblue) API documentation
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
