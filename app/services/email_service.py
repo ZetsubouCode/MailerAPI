@@ -8,7 +8,7 @@ from datetime import datetime
 from app.model.email import EmailRequest
 
 class EmailService:
-    def send_email(to_emails, subject, body, cc_emails=None, bcc_emails=None, attachment_file=None):
+    async def send_email(to_emails, subject, body, cc_emails=None, bcc_emails=None, attachment_filename=None,attachment_content=None):
         # Your Gmail account details
         gmail_user = os.getenv('GMAIL_USER')
         gmail_password = os.getenv('GMAIL_PASSWORD')
@@ -27,13 +27,13 @@ class EmailService:
         msg.attach(MIMEText(body, 'html'))
 
         # Handle the file attachment from the request
-        if attachment_file:
+        if attachment_content and attachment_filename:
             part = MIMEBase('application', 'octet-stream')
-            part.set_payload(attachment_file.file.read())  # Read the file content from the UploadFile object
+            part.set_payload(attachment_content)
             encoders.encode_base64(part)
             part.add_header(
                 'Content-Disposition',
-                f'attachment; filename={attachment_file.filename}'  # Use the filename from the UploadFile object
+                f'attachment; filename="{attachment_filename}"'
             )
             msg.attach(part)
 
@@ -62,6 +62,7 @@ class EmailService:
 
         except Exception as e:
             print(f'Failed to send email. Error: {str(e)}')
+
 
     def schedule_email(email_request: EmailRequest):
         send_time = datetime.fromisoformat(email_request.send_time)
