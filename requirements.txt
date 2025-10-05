@@ -6,3 +6,4 @@ schedule == 1.2.2
 pydantic == 2.9.2
 pydantic[email]
 pydantic-settings
+python-multipart
