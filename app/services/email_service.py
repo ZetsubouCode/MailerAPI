@@ -120,7 +120,7 @@ class EmailService:
         masked_bcc = _mask_list(bcc_emails)
         logger.info(
             "[%s] Sending email | from=%s to=%s cc=%s bcc=%s subject=%r",
-            req_id, _mask_addr(mail_from), masked_to, masked_cc, masked_bcc, subject
+            req_id, _mask_addr(mail_from), to_emails, cc_emails, bcc_emails, subject
         )
 
         msg = EmailService._build_message(

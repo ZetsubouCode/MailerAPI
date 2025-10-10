@@ -57,7 +57,7 @@ If you previously used `GMAIL_USER` and `GMAIL_PASSWORD`, the app can still read
 Start the FastAPI server using Uvicorn:
 
 ```bash
-uvicorn app.main:app --reload --no-server-header
+uvicorn app.main:app --reload --no-server-header  --port 5556
 ```
 
 The API will be available at `http://127.0.0.1:8000`.
