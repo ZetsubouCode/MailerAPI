@@ -57,10 +57,14 @@ If you previously used `GMAIL_USER` and `GMAIL_PASSWORD`, the app can still read
 Start the FastAPI server using Uvicorn:
 
 ```bash
-uvicorn app.main:app --reload --no-server-header  --port 5556
+uvicorn app.main:app --reload --no-server-header --port 5556
 ```
 
-The API will be available at `http://127.0.0.1:8000`.
+The API will be available at `http://127.0.0.1:5556`.
+
+Tip: Uvicorn defaults to port 8000 if you omit `--port`. If your client points to
+`http://127.0.0.1:5556`, make sure you start Uvicorn with `--port 5556` or run
+`python -m app` (uses `MAILER_API_PORT=5556` by default).
 
 ## API Endpoints
 
@@ -85,14 +89,14 @@ The API will be available at `http://127.0.0.1:8000`.
 #### Example cURL Request:
 
 ```bash
-curl -X 'POST'   'http://127.0.0.1:8000/api/send-email/'   -F 'to_emails=recipient1@example.com'   -F 'to_emails=recipient2@example.com'   -F 'cc_emails=cc1@example.com'   -F 'cc_emails=cc2@example.com'   -F 'bcc_emails=bcc1@example.com'   -F 'subject=Test Email'   -F 'body=This is a test email.'   -F 'attachment=@/path/to/attachment.pdf'
+curl -X 'POST'   'http://127.0.0.1:5556/api/send-email/'   -F 'to_emails=recipient1@example.com'   -F 'to_emails=recipient2@example.com'   -F 'cc_emails=cc1@example.com'   -F 'cc_emails=cc2@example.com'   -F 'bcc_emails=bcc1@example.com'   -F 'subject=Test Email'   -F 'body=This is a test email.'   -F 'attachment=@/path/to/attachment.pdf'
 ```
 
 This will send an email with the provided subject and body to the specified recipients, including CC and BCC recipients, and attach the specified file.
 
 ## API Documentation
 
-To test and check the functionality, you can access [FastAPI docs](http://localhost:8000/docs).
+To test and check the functionality, you can access [FastAPI docs](http://localhost:5556/docs).
 
 ## License
 

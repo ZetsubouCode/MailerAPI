@@ -6,6 +6,7 @@ import asyncio
 import logging
 import uuid
 from email.mime.multipart import MIMEMultipart
+from email.mime.image import MIMEImage
 from email.mime.text import MIMEText
 from email.mime.base import MIMEBase
 from email import encoders
@@ -72,32 +73,58 @@ class EmailService:
         subject: str,
         body: str,
         cc_emails: Optional[List[str]] = None,
-        attachment_filename: Optional[str] = None,
-        attachment_content: Optional[bytes] = None,
+        attachments: Optional[List[dict]] = None,
     ):
-        msg = MIMEMultipart()
+        attachments = attachments or []
+        inline_attachments = [a for a in attachments if a.get("inline")]
+        regular_attachments = [a for a in attachments if not a.get("inline")]
+
+        msg = MIMEMultipart("mixed") if inline_attachments else MIMEMultipart()
         msg["From"] = mail_from
         msg["To"] = ", ".join(to_emails)
         msg["Subject"] = subject
         if cc_emails:
             msg["Cc"] = ", ".join(cc_emails)
-        msg.attach(MIMEText(body, "html"))
+        if inline_attachments:
+            related = MIMEMultipart("related")
+            related.attach(MIMEText(body, "html"))
+            for att in inline_attachments:
+                content = att.get("content")
+                filename = att.get("filename") or "inline.png"
+                if not content:
+                    continue
+                subtype = None
+                ext = os.path.splitext(filename)[1].lower().lstrip(".")
+                if ext in {"jpg", "jpeg", "png", "gif", "webp"}:
+                    subtype = "jpeg" if ext == "jpg" else ext
+                img = MIMEImage(content, _subtype=subtype)
+                cid = att.get("cid") or filename
+                img.add_header("Content-ID", f"<{cid}>")
+                img.add_header("Content-Disposition", f'inline; filename="{filename}"')
+                related.attach(img)
+            msg.attach(related)
+        else:
+            msg.attach(MIMEText(body, "html"))
 
-        if attachment_content and attachment_filename:
+        for att in regular_attachments:
+            content = att.get("content")
+            filename = att.get("filename")
+            if not content or not filename:
+                continue
             part = MIMEBase("application", "octet-stream")
-            part.set_payload(attachment_content)
+            part.set_payload(content)
             encoders.encode_base64(part)
             part.add_header(
                 "Content-Disposition",
-                f'attachment; filename="{attachment_filename}"',
+                f'attachment; filename="{filename}"',
             )
             msg.attach(part)
 
         logger.debug(
-            "MIME message built | subject_len=%d body_len=%d attachment=%s",
+            "MIME message built | subject_len=%d body_len=%d attachments=%s",
             len(subject) if subject else 0,
             len(body) if body else 0,
-            f"{attachment_filename} ({len(attachment_content)} bytes)" if attachment_content else "none",
+            len(attachments),
         )
         return msg
 
@@ -108,8 +135,7 @@ class EmailService:
         body: str,
         cc_emails: Optional[List[str]] = None,
         bcc_emails: Optional[List[str]] = None,
-        attachment_filename: Optional[str] = None,
-        attachment_content: Optional[bytes] = None,
+        attachments: Optional[List[dict]] = None,
     ):
         req_id = uuid.uuid4().hex[:8]
         t0 = time.perf_counter()
@@ -124,7 +150,7 @@ class EmailService:
         )
 
         msg = EmailService._build_message(
-            mail_from, to_emails, subject, body, cc_emails, attachment_filename, attachment_content
+            mail_from, to_emails, subject, body, cc_emails, attachments
         )
         all_recipients = list(to_emails) + (cc_emails or []) + (bcc_emails or [])
 
@@ -183,8 +209,7 @@ class EmailService:
         body: str,
         cc_emails: Optional[List[str]] = None,
         bcc_emails: Optional[List[str]] = None,
-        attachment_filename: Optional[str] = None,
-        attachment_content: Optional[bytes] = None,
+        attachments: Optional[List[dict]] = None,
     ):
         # smtplib is blocking; run it in a thread to avoid blocking the event loop
         logger.debug("Dispatching send_email to thread executor (async wrapper)")
@@ -197,8 +222,7 @@ class EmailService:
             body,
             cc_emails,
             bcc_emails,
-            attachment_filename,
-            attachment_content,
+                attachments,
         )
 
     @staticmethod
@@ -208,13 +232,13 @@ class EmailService:
         Runs inside a thread started by the route.
         """
         req_id = uuid.uuid4().hex[:8]
-        try:
-            send_time = datetime.fromisoformat(email_request.send_time)
-        except Exception:
-            logger.error("[%s] Invalid send_time format: %r", req_id, getattr(email_request, "send_time", None))
-            raise
+        send_time = email_request.send_time
 
-        now = datetime.now()
+        tzinfo = send_time.tzinfo
+        if tzinfo is not None and tzinfo.utcoffset(send_time) is not None:
+            now = datetime.now(tz=tzinfo)
+        else:
+            now = datetime.now()
         delay = (send_time - now).total_seconds()
         logger.info(
             "[%s] Scheduling email | now=%s target=%s delay=%.3fs to=%s subject=%r",

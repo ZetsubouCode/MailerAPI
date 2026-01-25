@@ -1,3 +1,4 @@
+from datetime import datetime
 from pydantic import BaseModel, EmailStr
 from typing import List, Optional
 
@@ -7,3 +8,4 @@ class EmailRequest(BaseModel):
     body: str
     cc_emails: Optional[List[str]] = None
     bcc_emails: Optional[List[str]] = None
+    send_time: datetime
