@@ -12,6 +12,7 @@ app = FastAPI(title="SMTP Email Service")
 
 # Include the email routes
 app.include_router(email_router, prefix="/api", tags=["email"])
+app.include_router(email_router, tags=["email-compat"])
 
 logger = logging.getLogger("mailer.api")
 

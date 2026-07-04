@@ -5,11 +5,13 @@ import ssl
 import asyncio
 import logging
 import uuid
+import socket
 from email.mime.multipart import MIMEMultipart
 from email.mime.image import MIMEImage
 from email.mime.text import MIMEText
 from email.mime.base import MIMEBase
 from email import encoders
+from email.utils import make_msgid
 from datetime import datetime
 from typing import List, Optional
 
@@ -42,6 +44,15 @@ def _mask_addr(addr: str) -> str:
 
 def _mask_list(addrs: Optional[List[str]]) -> List[str]:
     return [] if not addrs else [_mask_addr(a) for a in addrs]
+
+
+class EmailServiceError(Exception):
+    def __init__(self, code: str, message: str, status_code: int = 500, request_id: Optional[str] = None):
+        super().__init__(message)
+        self.code = code
+        self.safe_message = message
+        self.status_code = status_code
+        self.request_id = request_id
 
 class EmailService:
     @staticmethod
@@ -83,6 +94,7 @@ class EmailService:
         msg["From"] = mail_from
         msg["To"] = ", ".join(to_emails)
         msg["Subject"] = subject
+        msg["Message-ID"] = make_msgid(domain=os.getenv("SMTP_MESSAGE_ID_DOMAIN") or None)
         if cc_emails:
             msg["Cc"] = ", ".join(cc_emails)
         if inline_attachments:
@@ -179,18 +191,32 @@ class EmailService:
             # Per smtplib docs, 'refused' is a dict of {recipient: (code, resp)} for any failures
             if refused:
                 logger.warning("[%s] Some recipients were refused: %s", req_id, refused)
-            else:
-                logger.info("[%s] Email accepted by server for all recipients", req_id)
+                raise EmailServiceError("RECIPIENT_REJECTED", "One or more recipients were rejected.", 502, req_id)
+            logger.info("[%s] Email accepted by server for all recipients", req_id)
+            return {
+                "status": True,
+                "smtp_accepted": True,
+                "message_id": str(msg["Message-ID"]),
+                "accepted_recipient_count": len(all_recipients),
+                "request_id": req_id,
+            }
 
         except smtplib.SMTPAuthenticationError as e:
             logger.error("[%s] SMTP auth failed: %s", req_id, str(e))
-            raise
+        except (smtplib.SMTPServerDisconnected, TimeoutError, socket.timeout) as e:
+            logger.error("[%s] SMTP timeout/disconnect: %s", req_id, str(e))
+            raise EmailServiceError("SMTP_TIMEOUT", "SMTP timed out or disconnected.", 504, req_id) from e
+        except (smtplib.SMTPConnectError, ConnectionRefusedError, OSError, socket.gaierror) as e:
+            logger.error("[%s] SMTP connect failed: %s", req_id, str(e))
+            raise EmailServiceError("SMTP_CONNECT_FAILED", "SMTP connection failed.", 502, req_id) from e
         except smtplib.SMTPException as e:
             logger.error("[%s] SMTP error: %s", req_id, str(e))
-            raise
+            raise EmailServiceError("SMTP_SEND_FAILED", "SMTP send failed.", 502, req_id) from e
         except Exception as e:
             logger.exception("[%s] Unexpected error during send: %s", req_id, str(e))
-            raise
+            if isinstance(e, EmailServiceError):
+                raise
+            raise EmailServiceError("INTERNAL_ERROR", "Internal mailer error.", 500, req_id) from e
         finally:
             if server:
                 try:
@@ -214,7 +240,7 @@ class EmailService:
         # smtplib is blocking; run it in a thread to avoid blocking the event loop
         logger.debug("Dispatching send_email to thread executor (async wrapper)")
         loop = asyncio.get_running_loop()
-        await loop.run_in_executor(
+        return await loop.run_in_executor(
             None,
             EmailService._send_now,
             to_emails,

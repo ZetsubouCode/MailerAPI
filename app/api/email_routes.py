@@ -1,12 +1,12 @@
 import os
 import logging
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException
+from fastapi.responses import JSONResponse
 from typing import List, Optional
 import threading
-import asyncio
 
 from app.model.email import EmailRequest
-from app.services.email_service import EmailService
+from app.services.email_service import EmailService, EmailServiceError
 
 router = APIRouter()
 logger = logging.getLogger("mailer.api")
@@ -77,21 +77,40 @@ async def _handle_send_email(
                     "cid": cid,
                 })
 
-        asyncio.create_task(
-            EmailService.send_email(
-                to_emails=to_emails,
-                subject=subject,
-                body=body,
-                cc_emails=cc_emails,
-                bcc_emails=bcc_emails,
-                attachments=attachments,
-            )
+        result = await EmailService.send_email(
+            to_emails=to_emails,
+            subject=subject,
+            body=body,
+            cc_emails=cc_emails,
+            bcc_emails=bcc_emails,
+            attachments=attachments,
         )
-        return {"status": True, "message": "Email is being sent in the background!"}
+        return result
     except HTTPException:
         raise
+    except EmailServiceError as e:
+        request_id = getattr(e, "request_id", None)
+        return JSONResponse(
+            status_code=e.status_code,
+            content={
+                "status": False,
+                "smtp_accepted": False,
+                "code": e.code,
+                "message": e.safe_message,
+                "request_id": request_id,
+            },
+        )
     except Exception as e:
-        return {"status": False, "message": f"Exception {e}"}
+        logger.exception("API.send_email failed")
+        return JSONResponse(
+            status_code=500,
+            content={
+                "status": False,
+                "smtp_accepted": False,
+                "code": "INTERNAL_ERROR",
+                "message": "Internal mailer error.",
+            },
+        )
 
 @router.post("/send-email/")
 async def send_email_route(
@@ -148,3 +167,8 @@ async def schedule_email_route(email_request: EmailRequest):
     thread.daemon = True
     thread.start()
     return {"status": True, "message": "Email scheduled successfully."}
+
+
+@router.get("/health")
+async def health():
+    return {"status": True, "service": "mailer-api"}
